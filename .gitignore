@@ -1,0 +1,10 @@
+# Biometric data: never commit face images or trained models
+data/
+
+# Attendance records
+Attendance/*.csv
+
+__pycache__/
+*.pyc
+.venv/
+venv/

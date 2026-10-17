@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6" crossorigin="anonymous">
+
+    <title>Add New User | Face Recognition Based Attendance System</title>
+
+    <style type="text/css">
+        * { padding: 0; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body {
+            background-image: url('https://cutewallpaper.org/21/1920-x-1080-gif/1920x1080-Wallpapercartoon-Wallpapers-Driverlayer-Search-.gif');
+            background-size: cover;
+            min-height: 100vh;
+            padding-bottom: 30px;
+        }
+        .camera-box { position: relative; max-width: 640px; margin: 0 auto; background: #000; border-radius: 12px; overflow: hidden; }
+        #video { display: block; width: 100%; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #status { max-width: 640px; margin: 12px auto; padding: 8px 12px; border-radius: 8px; color: #fff; font-size: 18px; background: rgba(0, 0, 0, .55); }
+        .progress { max-width: 640px; margin: 12px auto; height: 22px; }
+    </style>
+</head>
+
+<body>
+    <div class="mt-3 text-center">
+        <h1 style="color: white; padding: 11px; font-size: 36px;">Add New User</h1>
+        <a href="/" id="home-link" style="color: white; font-size: 18px;">&larr; Back to home</a>
+    </div>
+
+    <p id="status" class="text-center">Starting camera&hellip;</p>
+
+    <div class="camera-box">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlay"></canvas>
+    </div>
+    <canvas id="grab" hidden></canvas>
+
+    <div class="progress">
+        <div id="bar" class="progress-bar bg-success" role="progressbar" style="width: 0%">0 / {{ needed }}</div>
+    </div>
+
+    <div class="text-center mt-3">
+        <button id="retry" type="button" class="btn btn-primary btn-lg" hidden>Try again</button>
+        <a id="cancel" href="/" class="btn btn-secondary btn-lg">Cancel</a>
+    </div>
+
+    <script src="{{ url_for('static', filename='camera.js') }}"></script>
+    <script>
+        (function () {
+            "use strict";
+            var NAME = {{ name | tojson }};
+            var ROLL = {{ roll | tojson }};
+            var NEEDED = {{ needed }};
+            var INTERVAL_MS = 350;
+            var TIMEOUT_MS = 90000;
+
+            var video = document.getElementById("video");
+            var overlay = document.getElementById("overlay");
+            var grab = document.getElementById("grab");
+            var statusEl = document.getElementById("status");
+            var bar = document.getElementById("bar");
+            var retry = document.getElementById("retry");
+            var token = null;
+            var finished = false;
+            var leaving = false;
+
+            function setStatus(text, isError) {
+                statusEl.textContent = text;
+                statusEl.style.background = isError ? "rgba(180, 0, 0, .8)" : "rgba(0, 0, 0, .55)";
+            }
+
+            function setProgress(n) {
+                bar.style.width = Math.round(100 * n / NEEDED) + "%";
+                bar.textContent = n + " / " + NEEDED;
+            }
+
+            function cancelPending() {
+                if (token && !finished && navigator.sendBeacon) {
+                    var blob = new Blob([JSON.stringify({ token: token })], { type: "application/json" });
+                    navigator.sendBeacon("/api/register/cancel", blob);
+                }
+                token = null;
+            }
+
+            async function run() {
+                var stream = null;
+                retry.hidden = true;
+                finished = false;
+                setProgress(0);
+                setStatus("Starting camera\u2026");
+                try {
+                    stream = await Cam.startCamera(video);
+                    var start = await Cam.postJSON("/api/register/start", { name: NAME, roll: ROLL });
+                    token = start.token;
+                } catch (e) {
+                    Cam.stopCamera(stream, video);
+                    setStatus(Cam.describeError(e), true);
+                    retry.hidden = false;
+                    return;
+                }
+
+                setStatus("Look at the camera and slowly turn your head a little.");
+                var began = Date.now(), failures = 0, done = false, errorText = null;
+                while (!done && !leaving) {
+                    if (Date.now() - began > TIMEOUT_MS) {
+                        errorText = "No clear face was found in time. Move closer and improve the lighting.";
+                        break;
+                    }
+                    var t0 = Date.now();
+                    try {
+                        var frame = await Cam.grabFrame(video, grab);
+                        var res = await Cam.postFrame("/api/register/frame", { token: token }, frame.blob);
+                        failures = 0;
+                        setProgress(res.captured);
+                        Cam.drawFace(overlay, frame, res.face,
+                            res.captured + "/" + res.needed, "#1e90ff");
+                        done = res.done;
+                    } catch (e) {
+                        failures += 1;
+                        if (failures >= 5) { errorText = e.message; break; }
+                    }
+                    var wait = INTERVAL_MS - (Date.now() - t0);
+                    if (wait > 0) { await Cam.sleep(wait); }
+                }
+
+                Cam.stopCamera(stream, video);
+                overlay.getContext("2d").clearRect(0, 0, overlay.width, overlay.height);
+                if (leaving) { return; }
+
+                if (done) {
+                    setStatus("Saving and training\u2026");
+                    try {
+                        var fin = await Cam.postJSON("/api/register/finish", { token: token });
+                        finished = true;
+                        setStatus(fin.message + " Redirecting\u2026");
+                        setTimeout(function () { window.location.href = "/"; }, 1500);
+                        return;
+                    } catch (e) {
+                        errorText = e.message;
+                    }
+                }
+                cancelPending();
+                setStatus(errorText || "Registration failed.", true);
+                retry.hidden = false;
+            }
+
+            retry.addEventListener("click", run);
+            document.getElementById("cancel").addEventListener("click", function () {
+                leaving = true;
+                cancelPending();
+            });
+            window.addEventListener("pagehide", function () {
+                leaving = true;
+                cancelPending();
+            });
+
+            run();
+        })();
+    </script>
+</body>
+
+</html>

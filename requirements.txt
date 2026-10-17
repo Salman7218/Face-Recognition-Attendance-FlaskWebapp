@@ -1,0 +1,6 @@
+# Python 3.10 - 3.13
+Flask>=3.1,<4
+opencv-contrib-python-headless>=4.10   # contrib build is required for cv2.face (LBPH); headless = no display/GUI libs needed
+numpy>=2.0
+pandas>=2.2
+waitress>=3.0                          # production WSGI server (cross-platform)

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6" crossorigin="anonymous">
+
+    <title>Registered Users | Face Recognition Based Attendance System</title>
+
+    <style type="text/css">
+        * {
+            padding: 0;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-image: url('https://cutewallpaper.org/21/1920-x-1080-gif/1920x1080-Wallpapercartoon-Wallpapers-Driverlayer-Search-.gif');
+            background-size: cover;
+            min-height: 100vh;
+        }
+
+        table {
+            font-family: arial, sans-serif;
+            border-collapse: collapse;
+            width: 86%;
+            margin: auto;
+        }
+
+        td,
+        th {
+            border: 1px solid black !important;
+            padding: 5px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #dddddd;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="mt-3 text-center">
+        <h1 style="margin: auto; color: white; padding: 11px; font-size: 44px;">Registered Users</h1>
+        <a href="/" style="color: white; font-size: 18px;">&larr; Back to attendance</a>
+    </div>
+
+    {% if mess %}
+    <p class="text-center" style="color: {{ 'red' if error else '#0b4c61' }}; font-size: 20px; font-weight: bold;">{{ mess }}</p>
+    {% endif %}
+
+    <div class="text-center" style="padding: 20px; margin: 20px;">
+        <div style="border-radius: 20px; background-color: rgb(211,211,211,0.5); margin: 0 10px 10px 10px; min-height: 300px;">
+            <h2 style="border-radius: 20px 20px 0 0; background-color: #0b4c61; color: white; padding: 10px;">
+                Users <i class="material-icons">people</i>
+            </h2>
+
+            <table style="background-color: white; margin-top: 20px;">
+                <tr>
+                    <td><b>S No</b></td>
+                    <td><b>Name</b></td>
+                    <td><b>ID</b></td>
+                    <td><b>Action</b></td>
+                </tr>
+                {% for user in users %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ user.name }}</td>
+                    <td>{{ user.roll }}</td>
+                    <td>
+                        <form action="/deleteuser" method="POST" style="margin: 0;"
+                            onsubmit="return confirm('Delete {{ user.name }} and all their face images?');">
+                            <input type="hidden" name="user" value="{{ user.folder }}">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4">No users registered yet.</td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <h5 style="padding: 25px;"><i>Total Users in Database: {{ totalreg }}</i></h5>
+        </div>
+    </div>
+
+</body>
+
+</html>
